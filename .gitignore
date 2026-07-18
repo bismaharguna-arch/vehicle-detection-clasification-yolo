@@ -1,0 +1,49 @@
+# ============================================================
+# Yang di-commit HANYA yang dipakai program:
+#   src/, tools/, models/ (2 weights aktif), evaluate.py,
+#   train_plate.py, requirements.txt, start.bat, gui.bat,
+#   docs & template dataset/eval_set, CLAUDE.md, TECHSTACK.md
+# ============================================================
+
+# Rahasia lokal -- JANGAN pernah di-commit. Kunci X-API-Key web monitoring
+# dibaca src/main.py dari file ini; copy manual ke mesin baru.
+api_key.txt
+
+# Environment Python (di-restore lewat requirements.txt, bukan git)
+venv/
+
+# Parkir file tak terpakai (model lama, video lama, artefak diagnostik)
+unused/
+
+# Hasil runtime: capture push, mock server, screenshot, diagram olahan
+output/
+hasil deteksi/
+*.jsonl
+
+# Artefak tooling (knowledge graph Claude), bukan bagian program
+graphify-out/
+.claude/
+
+# Video uji -- terlalu besar & bukan bagian program
+*.mp4
+*.avi
+*.mkv
+
+# Dokumen skripsi (bukan program)
+*.docx
+
+# Artefak training YOLO (weights terpilih disalin manual ke models/)
+runs/
+
+# Isi dataset training (besar; struktur & README tetap ke-commit)
+dataset/images/
+dataset/labels/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# OS
+Thumbs.db
+desktop.ini

@@ -1,0 +1,7 @@
+filename,vehicle_type,plate_text,fuel_type,plate_x1,plate_y1,plate_x2,plate_y2
+img001.jpg,mobil,B 1234 ABC,bensin,520,610,720,660
+img002.jpg,motor,AB 567 XY,bensin,310,440,420,478
+img003.jpg,mobil,B 9999 ZZZ,listrik,610,520,800,572
+img004.jpg,motor,D 4321 CD,listrik,290,455,395,492
+img005.jpg,mobil,,,,,,
+img006.jpg,,,,,,,

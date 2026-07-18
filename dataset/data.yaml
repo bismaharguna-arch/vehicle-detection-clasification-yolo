@@ -1,0 +1,13 @@
+# YOLO dataset config untuk fine-tune detektor plat Indonesia.
+# Path relatif terhadap file ini, atau absolut.
+
+path: ../dataset       # root dataset
+train: images/train    # relatif terhadap `path`
+val: images/val
+test: images/test      # opsional
+
+# Hanya 1 kelas: license_plate. Fokus, jangan tambah kelas vehicle di sini --
+# vehicle dideteksi oleh model COCO terpisah (yolov8n.pt).
+nc: 1
+names:
+  0: license_plate
