@@ -27,7 +27,11 @@ class DetectionLogger:
         self.path = log_path
         self.source = source
         self.flush_every = max(1, flush_every)
-        self._fh = open(log_path, 'a', encoding='utf-8', buffering=1)
+        # Block buffering (default) + flush eksplisit per log() di bawah.
+        # buffering=1 (line-buffered) = syscall write per BARIS deteksi;
+        # dengan banyak deteksi per frame itu boros. Tail-ability tetap:
+        # flush_every=1 -> flush tiap frame.
+        self._fh = open(log_path, 'a', encoding='utf-8')
         self._counter = 0
         print(f'[Logger] JSONL -> {log_path}')
 

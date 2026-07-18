@@ -526,18 +526,25 @@ class VehicleTracker:
             t['last_seen'] = self._frame_idx
             t['conf'] = v['confidence']
 
-            # Fuel: bukti POSITIF (strip biru terlihat -> listrik) menimpa
-            # bukti lemah (strip tak terlihat -> bensin). Kendaraan jauh
-            # hampir selalu kebaca 'bensin' duluan karena stripnya belum
-            # kelihatan; jangan kunci bacaan pertama. Butuh >=2 frame
-            # listrik supaya kilatan biru sekali-lewat tidak salah flip.
+            # Fuel: voting berbobot SIMETRIS (rombak Jul 2026). Aturan lama --
+            # 2 frame 'listrik' mengunci track selamanya, tak bisa balik --
+            # membuat FP kilatan (cast biru sesaat, silau) jadi permanen padahal
+            # mayoritas frame bilang bensin. Sekarang tiap frame ber-plat memberi
+            # suara berbobot tinggi-bbox (kendaraan dekat = plat besar = bukti
+            # kuat; filosofi yang sama dengan koreksi plat), dan keputusan
+            # dihitung ulang tiap frame: listrik harus MENANG bobot DAN punya
+            # >= 2 frame listrik; selain itu bensin.
             if v['_fuel']:
+                w = float(self._height(v['bbox']))
+                t['fuel_votes'][v['_fuel']] = t['fuel_votes'].get(v['_fuel'], 0.0) + w
                 if v['_fuel'] == 'listrik':
-                    t['listrik_seen'] += 1
-                if not t['fuel']:
-                    t['fuel'] = v['_fuel']
-                elif t['fuel'] == 'bensin' and t['listrik_seen'] >= 2:
+                    t['listrik_frames'] += 1
+                wl = t['fuel_votes'].get('listrik', 0.0)
+                wb = t['fuel_votes'].get('bensin', 0.0)
+                if wl > wb and t['listrik_frames'] >= 2:
                     t['fuel'] = 'listrik'
+                else:
+                    t['fuel'] = 'bensin'
 
             # Plate text: pakai bacaan non-empty terbaru, TAPI lacak berapa
             # lama teks bertahan tak berubah. Bacaan pertama sering salah dan
@@ -718,8 +725,12 @@ class VehicleTracker:
             'frames_seen': 1,
             'first_seen': self._frame_idx,
             'last_seen': self._frame_idx,
-            'fuel': v['_fuel'],
-            'listrik_seen': 1 if v['_fuel'] == 'listrik' else 0,
+            # Frame pertama tidak pernah cukup untuk 'listrik' (butuh >= 2 frame
+            # di voting) -> mulai 'bensin' kalau ada bukti plat, kosong kalau belum.
+            'fuel': 'bensin' if v['_fuel'] else '',
+            'fuel_votes': ({v['_fuel']: float(self._height(v['bbox']))}
+                           if v['_fuel'] else {}),
+            'listrik_frames': 1 if v['_fuel'] == 'listrik' else 0,
             'plate_text': txt,
             'plate_settle': 1 if txt else 0,
             'plate_votes': {txt: 1} if txt else {},

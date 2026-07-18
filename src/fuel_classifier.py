@@ -12,17 +12,23 @@ import numpy as np
 
 class FuelClassifier:
     def __init__(self,
-                 strip_coverage_threshold=0.5,
+                 strip_coverage_threshold=0.85,
                  focus_bottom_ratio=0.4,
                  extend_below_ratio=0.5,
                  hsv_lower=(95, 35, 60),
                  hsv_upper=(135, 255, 255),
-                 strip_sat_ratio=1.1):
+                 strip_sat_ratio=1.1,
+                 strip_s_min=75,
+                 strip_v_min=95):
         """
         Args:
             strip_coverage_threshold: Minimum lebar plat yang harus tertutup garis
                                   biru di SATU baris (0-1). >= threshold -> listrik.
-                                  Default 0.5 = ada baris yang biru >=50% lebar plat.
+                                  Default 0.85 (dinaikkan dari 0.5 Jul 2026). BATAS
+                                  ATAP: 11 EV asli berlabel ber-strip_score >=0.89,
+                                  jadi 0.85 cuma bermargin 0.04; di 0.90 EV asli mulai
+                                  hilang. JANGAN naikkan lagi. Turunkan (mis. 0.6)
+                                  kalau EV miring/terpotong di lapangan terbaca bensin.
             focus_bottom_ratio:   Bagian bawah plat yang dicek (0-1).
                                   Default 0.4 = bawah 40% (lokasi garis biru EV).
             extend_below_ratio:   Perpanjang bbox ke bawah sebesar rasio tinggi box,
@@ -51,6 +57,16 @@ class FuelClassifier:
         # plat kehitung biru (diukur: plat UK ber-cast, top S>=bot S); strip EV
         # asli selalu lebih pekat dari permukaan teksnya (63 vs 53).
         self.strip_sat_ratio = strip_sat_ratio
+        # Guard "biru asli" (Jul 2026, dikalibrasi dari 84 capture push berlabel:
+        # 11 EV asli vs 73 FP): MEDIAN S/V piksel biru di zona strip. EV asli
+        # S 71-233 (med 148) V 71-209 (med 181); FP cast/plat-gelap med S 60.
+        # PENTING: ini beda dari kalibrasi S>=70 yang pernah di-revert -- range
+        # inRange TETAP longgar (S>=35) jadi coverage strip tidak runtuh; yang
+        # dicek cuma "piksel tipikal strip itu biru pekat & cukup terang".
+        # S>=75 V>=95 -> 10/11 EV selamat, 17/20 FP tertolak (single-frame).
+        # Limitasi jujur: strip EV di malam gelap (S~71 V~71) ikut tertolak.
+        self.strip_s_min = strip_s_min
+        self.strip_v_min = strip_v_min
 
     def classify(self, frame, bbox):
         """
@@ -104,9 +120,20 @@ class FuelClassifier:
         S = hsv[:, :, 1]
         top_mask = mask[:int(h * 0.5), :]
         top_s = S[:int(h * 0.5), :][top_mask > 0]
-        bot_s = S[focus_y:, :][bot > 0]
+        bot_sel = bot > 0
+        bot_s = S[focus_y:, :][bot_sel]
         if top_s.size >= 10 and bot_s.size >= 10:
             if float(np.median(bot_s)) < float(np.median(top_s)) * self.strip_sat_ratio:
+                return 'bensin', strip_score
+
+        # Guard "biru asli": strip EV = pigmen biru pekat & terang. FP dominan
+        # (plat hitam ternaungi, plat putih silau ber-cast) lolos coverage tapi
+        # median S/V-nya rendah -> tolak. Lihat catatan kalibrasi di __init__.
+        if bot_s.size >= 10:
+            V = hsv[:, :, 2]
+            bot_v = V[focus_y:, :][bot_sel]
+            if (float(np.median(bot_s)) < self.strip_s_min
+                    or float(np.median(bot_v)) < self.strip_v_min):
                 return 'bensin', strip_score
 
         return 'listrik', strip_score
@@ -121,7 +148,9 @@ if __name__ == '__main__':
     ev = plate.copy(); ev[34:, :] = blue           # garis penuh-lebar di bawah
     uk = plate.copy(); uk[:, :12] = blue           # band tepi kiri
     cast = np.full((40, 200, 3), (200, 165, 140), np.uint8)  # seluruh plat biru pudar
+    dark = plate.copy(); dark[34:, :] = (80, 40, 20)  # "strip" biru gelap (naungan)
     assert fc.classify(ev, (0, 0, 200, 40))[0] == 'listrik', 'strip EV harus listrik'
     assert fc.classify(uk, (0, 0, 200, 40))[0] == 'bensin', 'band kiri harus bensin'
     assert fc.classify(cast, (0, 0, 200, 40))[0] == 'bensin', 'cast biru merata harus bensin'
-    print('OK: strip-coverage + anti-cast fuel classifier')
+    assert fc.classify(dark, (0, 0, 200, 40))[0] == 'bensin', 'strip gelap harus bensin (guard V)'
+    print('OK: strip-coverage + anti-cast + guard biru-asli fuel classifier')

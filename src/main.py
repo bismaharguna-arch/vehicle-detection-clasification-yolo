@@ -95,6 +95,18 @@ def build_parser():
                    help='Confidence threshold vehicle.')
     p.add_argument('--plate-conf', type=float, default=None,
                    help='Confidence threshold plat (default = --conf).')
+    p.add_argument('--fuel-coverage', type=float, default=0.85,
+                   help='Guard geometri: minimum fraksi LEBAR plat yang tertutup '
+                        'strip biru di satu baris (0-1). Default 0.85 (batas atap; '
+                        'EV asli berlabel min 0.89, di 0.90 mulai hilang). Turunkan '
+                        '(mis. 0.6) kalau plat EV miring/terpotong terbaca bensin.')
+    p.add_argument('--fuel-smin', type=int, default=75,
+                   help='Guard biru-asli: minimum MEDIAN saturasi piksel strip EV. '
+                        'Kalibrasi Jul 2026 dari capture berlabel (EV asli med S=148, '
+                        'FP med S=60). Turunkan kalau EV asli mulai terbaca bensin.')
+    p.add_argument('--fuel-vmin', type=int, default=95,
+                   help='Guard biru-asli: minimum MEDIAN brightness (V) piksel strip EV. '
+                        'Menolak plat gelap ternaungi yang kebaca biru. Default 95.')
 
     # ---- OCR ----
     p.add_argument('--no-ocr', action='store_true',

@@ -448,12 +448,16 @@ class DetectorGUI:
             frame = self._latest
             fps = self._fps
         if frame is not None:
-            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            h, w = rgb.shape[:2]
+            # Resize DULU (di BGR) baru konversi warna: cvtColor + PhotoImage
+            # lalu bekerja di gambar kecil, bukan 1080p penuh -- memangkas waktu
+            # main-thread (yang menyandera GIL dari worker deteksi). Hasil piksel
+            # identik: resize per-channel tidak peduli urutan channel.
+            h, w = frame.shape[:2]
             if w > PREVIEW_MAX_W:
                 scale = PREVIEW_MAX_W / w
-                rgb = cv2.resize(rgb, (PREVIEW_MAX_W, int(h * scale)),
-                                 interpolation=cv2.INTER_AREA)
+                frame = cv2.resize(frame, (PREVIEW_MAX_W, int(h * scale)),
+                                   interpolation=cv2.INTER_AREA)
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             self._imgtk = ImageTk.PhotoImage(Image.fromarray(rgb))
             self.preview.configure(image=self._imgtk)
 

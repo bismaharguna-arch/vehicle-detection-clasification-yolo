@@ -54,6 +54,12 @@ class VehicleDetector:
         if device is None:
             device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
+        # CATATAN (Jul 2026): cudnn.benchmark=True pernah dicoba di sini --
+        # gain FPS terukur ~nol untuk yolov8n, tapi mengorbankan output
+        # byte-identik antar run (algoritma conv bisa berganti -> bbox geser
+        # +-1 px, conf geser di digit terakhir). Reproducibility lebih
+        # berharga; jangan nyalakan lagi tanpa benchmark yang membuktikan
+        # untung nyata.
         self.device = device
         self.conf_threshold = conf_threshold
         self.lower_threshold = lower_threshold
@@ -202,13 +208,10 @@ class VehicleDetector:
         if len(results) == 0:
             return vehicle_dets, plate_dets
 
-        for box in results[0].boxes:
-            cls_id = int(box.cls[0])
+        for cls_id, confidence, (x1, y1, x2, y2) in self._extract_boxes(results[0]):
             local_name = self._unified_name_map.get(cls_id)
             if local_name not in VIRTUAL_CLASS_ID:
                 continue
-            confidence = float(box.conf[0])
-            x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
             bbox = (x1, y1, x2, y2)
 
             if local_name == 'plat':
@@ -254,13 +257,10 @@ class VehicleDetector:
         )
 
         if len(veh_results) > 0:
-            for box in veh_results[0].boxes:
-                coco_id = int(box.cls[0])
+            for coco_id, confidence, (x1, y1, x2, y2) in self._extract_boxes(veh_results[0]):
                 if coco_id not in COCO_VEHICLE_MAP:
                     continue
                 local_name = COCO_VEHICLE_MAP[coco_id]
-                confidence = float(box.conf[0])
-                x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
 
                 vehicle_dets.append({
                     'class_id': VIRTUAL_CLASS_ID[local_name],
@@ -284,9 +284,7 @@ class VehicleDetector:
 
         plate_dets = []
         if len(plate_results) > 0:
-            for box in plate_results[0].boxes:
-                confidence = float(box.conf[0])
-                x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+            for _cls, confidence, (x1, y1, x2, y2) in self._extract_boxes(plate_results[0]):
                 bbox = (x1, y1, x2, y2)
 
                 fuel_type = ''
@@ -305,6 +303,25 @@ class VehicleDetector:
                 })
 
         return vehicle_dets, plate_dets
+
+    @staticmethod
+    def _extract_boxes(result):
+        """Tarik (cls, conf, xyxy) SEKALI dari GPU sebagai numpy, lalu iterasi.
+        Versi lama akses box.cls[0]/box.conf[0]/box.xyxy[0] per box = puluhan
+        sync GPU->CPU kecil per frame (masing-masing ratusan mikrodetik).
+        Nilai identik: int() dan .astype(int) sama-sama truncate-toward-zero.
+        Return list of (int cls_id, float conf, (x1, y1, x2, y2))."""
+        boxes = result.boxes
+        if boxes is None or len(boxes) == 0:
+            return []
+        cls = boxes.cls.cpu().numpy()
+        conf = boxes.conf.cpu().numpy()
+        xyxy = boxes.xyxy.cpu().numpy()
+        return [
+            (int(cls[i]), float(conf[i]),
+             (int(xyxy[i][0]), int(xyxy[i][1]), int(xyxy[i][2]), int(xyxy[i][3])))
+            for i in range(len(cls))
+        ]
 
     def _run_ocr(self, frame, plate_dets):
         """Untuk tiap plat: cari di cache via IoU; jadwalkan (re-)OCR di worker

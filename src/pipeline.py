@@ -53,7 +53,11 @@ class DetectionPipeline:
         self.args = args
 
         # ---- Komponen (urutan & argumen sama persis dengan main.py lama) ----
-        self.fuel = FuelClassifier()
+        self.fuel = FuelClassifier(
+            strip_coverage_threshold=getattr(args, 'fuel_coverage', 0.85),
+            strip_s_min=getattr(args, 'fuel_smin', 75),
+            strip_v_min=getattr(args, 'fuel_vmin', 95),
+        )
 
         self.plate_reader = None
         if not args.no_ocr:
@@ -204,10 +208,14 @@ class DetectionPipeline:
         self.tracker.update(frame, detections)
         if log_frame and self._logger is not None:
             self._logger.log(frame_idx, detections)
+        if not draw_overlay:
+            # Tanpa overlay tidak ada yang digambar -> copy frame utuh (~2-3 ms
+            # @1080p) percuma; kembalikan frame apa adanya. Caller (GUI toggle
+            # OFF) hanya menampilkan, tidak memodifikasi.
+            return frame, detections
         annotated = frame.copy()
-        if draw_overlay:
-            draw_detections(annotated, detections)
-            draw_detection_count(annotated, detections)
+        draw_detections(annotated, detections)
+        draw_detection_count(annotated, detections)
         return annotated, detections
 
     # ---- Shutdown -----------------------------------------------------------
