@@ -31,6 +31,7 @@ graphify-out/
 
 # Dokumen skripsi (bukan program)
 *.docx
+*.pdf
 
 # Artefak training YOLO (weights terpilih disalin manual ke models/)
 runs/

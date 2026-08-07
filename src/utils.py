@@ -23,7 +23,7 @@ FUEL_COLORS = {
 # & payload web tetap 'bensin' (kontrak v1 is_electric = 'bensin'|'listrik'|
 # 'unknown'; nilai lain di-coerce server jadi 'unknown', jangan ubah).
 FUEL_DISPLAY = {
-    'bensin': 'bbm',
+    'bensin': 'konvensional',
 }
 
 DEFAULT_COLOR = (200, 200, 200)  # Abu-abu untuk class yang tidak dikenal
